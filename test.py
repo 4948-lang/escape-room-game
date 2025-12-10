@@ -1,50 +1,63 @@
 import streamlit as st
 
 # 1. 게임 제목
-st.title('🔒 방탈출 게임: 어두운 독방')
+st.title('🕵️ 방탈출: 수학자의 서재')
 
-# 2. 게임 상태 초기화 (새로고침 해도 데이터 유지)
+# 2. 게임 상태 초기화
 if 'inventory' not in st.session_state:
     st.session_state.inventory = [] 
-if 'key_found' not in st.session_state:
-    st.session_state.key_found = False
+if 'safe_opened' not in st.session_state:
+    st.session_state.safe_opened = False
 if 'game_cleared' not in st.session_state:
     st.session_state.game_cleared = False
 if 'log' not in st.session_state:
-    st.session_state.log = ['당신은 차가운 방 바닥에서 눈을 떴습니다.', '주변에는 [침대]와 굳게 닫힌 [문]이 보입니다.']
+    st.session_state.log = ['당신은 어느 수학자의 서재에 갇혔습니다.', '단서를 모아 금고를 열어야 합니다.']
 
-# 3. 기능 함수들
+# 3. 기능 함수들 (여기가 핵심!)
 def add_log(message):
     st.session_state.log.append(message)
 
-def check_bed():
-    if st.session_state.key_found:
-        add_log('>> 이미 침대 밑을 확인했습니다. 먼지뿐입니다.')
+def check_clock():
+    add_log('>> [벽시계]를 봅니다. 낡아서 멈춰있습니다.')
+    add_log('>> 시침은 10시, 분침은 30분을 가리킵니다.')
+
+def check_calendar():
+    add_log('>> [달력]을 봅니다. 12월 달력입니다.')
+    add_log('>> 날짜 25일에 빨간 동그라미가 쳐져 있습니다.')
+
+def check_note():
+    add_log('>> 바닥에 떨어진 [쪽지]를 주웠습니다.')
+    add_log('>> 힌트: "비밀번호 = (달력의 월 + 달력의 일) - 시계의 시"')
+
+def try_safe(password):
+    if st.session_state.safe_opened:
+        add_log('>> 금고는 이미 열려있습니다.')
+    # 정답: (12 + 25) - 10 = 27
+    elif password == '27': 
+        add_log('>> 띠리릭! 정답입니다!')
+        add_log('>> 금고 안에서 [도서관 열쇠]를 발견했습니다.')
+        st.session_state.inventory.append('도서관 열쇠')
+        st.session_state.safe_opened = True
     else:
-        add_log('>> 침대 베개를 들추자 [황금 열쇠]가 나왔습니다!')
-        add_log('>> [황금 열쇠]를 가방에 넣었습니다.')
-        st.session_state.inventory.append('황금 열쇠')
-        st.session_state.key_found = True
+        add_log('>> 비밀번호가 틀렸습니다. 다시 계산해보세요.')
 
 def open_door():
-    if '황금 열쇠' in st.session_state.inventory:
-        add_log('>> 찰칵! 열쇠가 구멍에 딱 맞습니다.')
-        add_log('>> 끼익... 문이 열렸습니다. 탈출 성공! 🎉')
+    if '도서관 열쇠' in st.session_state.inventory:
+        add_log('>> 찰칵! 문이 열렸습니다. 탈출 성공! 🎉')
         st.session_state.game_cleared = True
     else:
-        add_log('>> 문은 잠겨 있습니다. 열쇠가 필요해 보입니다.')
+        add_log('>> 문은 잠겨 있습니다. 열쇠가 필요합니다.')
 
 def restart():
     st.session_state.inventory = []
-    st.session_state.key_found = False
+    st.session_state.safe_opened = False
     st.session_state.game_cleared = False
-    st.session_state.log = ['게임을 다시 시작합니다.', '주변에는 [침대]와 굳게 닫힌 [문]이 보입니다.']
+    st.session_state.log = ['게임을 다시 시작합니다.']
 
 # 4. 화면 표시 (UI)
-st.subheader('게임 상황')
-# 로그가 너무 길어지면 최근 5줄만 보여주기
-for msg in st.session_state.log[-5:]:
-    st.text(msg)
+st.subheader('📜 게임 로그')
+log_text = '\n'.join(st.session_state.log)
+st.text_area("기록", log_text, height=200)
 
 st.write('---')
 
@@ -54,15 +67,32 @@ if st.session_state.game_cleared:
         restart()
         st.rerun()
 else:
-    col1, col2, col3 = st.columns(3)
+    # 버튼 4개를 2줄로 배치 (col1, col2)
+    col1, col2 = st.columns(2)
+    
     with col1:
-        if st.button('침대 조사'):
-            check_bed()
+        if st.button('🕰️ 시계 확인'):
+            check_clock()
             st.rerun()
+        if st.button('📅 달력 확인'):
+            check_calendar()
+            st.rerun()
+            
     with col2:
-        if st.button('문 열기'):
-            open_door()
+        if st.button('📄 쪽지 읽기'):
+            check_note()
             st.rerun()
-    with col3:
-        if st.button('가방 확인'):
-            st.info(f'소지품: {st.session_state.inventory}')
+        # 금고 버튼 (팝오버)
+        with st.popover("🔐 금고 열기"):
+            st.write("힌트를 조합해 숫자를 입력하세요.")
+            user_pass = st.text_input("Password")
+            if st.button("입력"):
+                try_safe(user_pass)
+                st.rerun()
+
+    st.write('---')
+    if st.button('🚪 문 열기'):
+        open_door()
+        st.rerun()
+
+    st.info(f'🎒 소지품: {st.session_state.inventory}')
